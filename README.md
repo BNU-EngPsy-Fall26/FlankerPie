@@ -1,6 +1,6 @@
 # 🥧 FlankerPie · 注意实验平台
 
-**🔗 在线实验（GitHub Pages）：<https://注意：部署完成后把这里换成你的 Pages 链接>**
+**🔗 在线实验：** https://你的用户名.github.io/FlankerPie/ ←（部署后把这一行换成真实链接）
 
 > 工程心理学作业二 ——「构建一个『注意实验』：重现 + 改进」
 > 纯 HTML/CSS/原生 JavaScript 单文件实验程序 + Python 数据分析，零框架、零构建。
