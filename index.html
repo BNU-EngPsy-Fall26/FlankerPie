@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>注意实验 · Flanker 距离 + 3D/2D 饼图比例判断（含眼动）</title>
+<style>
+  :root { --navy:#0D2B5C; --gold:#C8A44A; --muted:#788296; --line:#e0e4eb; --red:#d64045; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"PingFang SC","Microsoft YaHei",sans-serif; background:#f5f7fa; color:#323c50; }
+  .hidden { display:none !important; }
+  section.screen { max-width:900px; margin:36px auto; background:#fff; border-radius:14px; padding:28px 32px; box-shadow:0 4px 20px rgba(13,43,92,.08); }
+  section.screen.wide { max-width:none; margin:0; border-radius:0; box-shadow:none; padding:0; }
+  h1, h2, h3 { color:var(--navy); font-family:"Georgia","Songti SC",serif; }
+  h1 { font-size:26px; margin-bottom:4px; }
+  h2 { font-size:22px; }
+  h3 { font-size:17px; }
+  button { padding:10px 22px; border:none; border-radius:8px; background:var(--gold); color:#fff; font-size:15px; cursor:pointer; font-family:inherit; }
+  button:hover { opacity:.9; }
+  button.secondary { background:#fff; color:var(--navy); border:1px solid #ccd; }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  input[type=text], input:not([type]) { padding:8px 10px; font-size:15px; border:1px solid #ccd; border-radius:6px; width:260px; }
+  kbd { padding:1px 7px; border:1px solid #ccd; border-bottom-width:2px; border-radius:4px; background:#f7f8fa; font-family:monospace; font-size:13px; }
+  .muted { color:var(--muted); font-size:13px; }
+  ul { line-height:1.7; }
+  .status-tag { display:inline-block; padding:2px 10px; border-radius:10px; font-size:12px; font-weight:700; }
+  .status-done { background:#e8f5e9; color:#2e7d32; }
+  .status-pending { background:#fff3e0; color:#e65100; }
+  .note { background:#f7f9fc; border-left:3px solid var(--gold); padding:12px 16px; border-radius:0 8px 8px 0; font-size:13.5px; line-height:1.75; margin:14px 0; }
+  .note b { color:var(--navy); }
+  .kv { display:flex; gap:8px; flex-wrap:wrap; font-size:13px; color:var(--muted); }
+  .kv span { background:#f1f4f9; padding:3px 9px; border-radius:6px; }
+
+  /* ---------- 实验舞台 ---------- */
+  #s-stage { position:fixed; inset:0; background:#202532; display:none; flex-direction:column; align-items:center; justify-content:center; color:#fff; overflow:hidden; z-index:100; }
+  #s-stage.show { display:flex; }
+  #msg { position:absolute; top:9%; left:0; right:0; text-align:center; font-size:21px; color:#ffd54a; padding:0 24px; line-height:1.5; }
+  #fix { font-size:64px; color:#fff; font-weight:300; }
+  #flanker-row { display:flex; align-items:center; justify-content:center; font-weight:800; min-height:110px; }
+  #flanker-row .flank, #flanker-row .target { color:#fff; line-height:1; }
+  #flanker-row .target { color:#fff; }
+  #progress { position:absolute; bottom:14px; right:20px; font-size:13px; color:#8a93a6; font-family:monospace; }
+  #gaze-indicator { position:absolute; bottom:14px; left:20px; font-size:12px; color:#8a93a6; font-family:monospace; }
+  #stage-tip { position:absolute; bottom:14px; left:0; right:0; text-align:center; font-size:12px; color:#5f6878; font-family:monospace; }
+
+  /* 舞台左上角进度 */
+  #exp-progress { position:absolute; top:20px; left:20px; width:260px; z-index:5; pointer-events:none; }
+  #exp-progress .exp-progress-bar { width:100%; height:8px; background:rgba(255,255,255,.15); border-radius:4px; overflow:hidden; }
+  #exp-progress .exp-progress-fill { height:100%; width:0%; background:var(--gold); transition:width .2s ease; }
+  #exp-progress .exp-progress-txt { margin-top:6px; font-size:12.5px; color:rgba(255,255,255,.78); font-family:monospace; letter-spacing:.3px; }
+  #exp-progress.practice .exp-progress-fill { background:rgba(200,164,74,.55); }
+  #exp-progress.practice .exp-progress-txt { color:rgba(255,255,255,.55); }
+
+  /* 饼图刺激 + 作答 */
+  #pie-wrap { display:none; flex-direction:column; align-items:center; gap:6px; }
+  #pie-wrap.show { display:flex; }
+  #pie-canvas { max-width:88vw; max-height:48vh; height:auto; }
+  #pie-resp { display:flex; align-items:center; gap:14px; margin-top:18px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:14px 22px; flex-wrap:wrap; justify-content:center; }
+  #pie-resp .lab { font-size:14.5px; color:#c9d2e0; }
+  #pie-val { font-size:24px; font-weight:800; color:#ffd54a; font-family:monospace; min-width:56px; text-align:right; }
+  #pie-resp .unit { color:#c9d2e0; font-size:15px; margin-left:-8px; }
+  #pie-slider { -webkit-appearance:none; appearance:none; width:min(320px,42vw); height:8px; border-radius:4px; background:#3a4356; outline:none; }
+  #pie-slider::-webkit-slider-thumb { -webkit-appearance:none; width:26px; height:26px; border-radius:50%; background:var(--gold); border:3px solid #fff; cursor:pointer; }
+  #pie-slider::-moz-range-thumb { width:22px; height:22px; border-radius:50%; background:var(--gold); border:3px solid #fff; cursor:pointer; }
+
+  /* ---------- 菜单 ---------- */
+  .menu-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px; }
+  .menu-header .meta { color:var(--muted); font-size:14px; }
+  .menu-header .meta b { color:var(--navy); }
+  .menu-cards { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin:20px 0; }
+  @media(max-width:720px){ .menu-cards { grid-template-columns:1fr; } }
+  .card { border:2px solid var(--line); border-radius:14px; padding:20px 22px; background:#fff; display:flex; flex-direction:column; gap:8px; }
+  .card.done { border-color:var(--gold); background:#fffdf7; }
+  .card h3 { margin:0; font-size:19px; }
+  .card p { margin:0; font-size:14px; line-height:1.6; }
+  .card .footer { margin-top:auto; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .viz-btn { display:none; margin-top:12px; width:100%; font-size:17px; padding:14px; }
+  .viz-btn.show { display:block; }
+
+  /* ---------- 校准 ---------- */
+  #cal-grid { position:relative; width:100%; height:55vh; background:#202532; border-radius:12px; overflow:hidden; margin:16px 0; }
+  .cal-dot { position:absolute; width:34px; height:34px; margin:-17px 0 0 -17px; border-radius:50%; background:var(--gold); box-shadow:0 0 0 6px rgba(200,164,74,.35); cursor:pointer; border:none; font-size:16px; color:#fff; font-weight:700; transition:transform .15s; }
+  .cal-dot:hover { transform:scale(1.12); }
+
+  /* ---------- 可视化 ---------- */
+  #s-viz section.block { background:#fff; border-radius:14px; padding:22px 24px; margin-bottom:20px; box-shadow:0 4px 20px rgba(13,43,92,.06); }
+  #s-viz h3 { margin-top:0; }
+  #s-viz h4 { font-size:14px; color:var(--navy); margin:22px 0 6px; font-weight:700; }
+  .chart { width:100%; max-width:720px; margin:8px auto; }
+  .viz-header { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  .tbl { width:100%; border-collapse:collapse; font-size:13.5px; margin:10px 0; }
+  .tbl th, .tbl td { border-bottom:1px solid var(--line); padding:7px 10px; text-align:right; }
+  .tbl th { color:var(--navy); font-weight:700; background:#f7f9fc; }
+  .tbl td:first-child, .tbl th:first-child { text-align:left; }
+  .toast { position:fixed; left:50%; bottom:38px; transform:translateX(-50%) translateY(20px); background:#0D2B5C; color:#fff; padding:12px 22px; border-radius:10px; font-size:14px; opacity:0; transition:.25s; z-index:999; pointer-events:none; max-width:80vw; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- ==================== 1. 知情同意 ==================== -->
+<section class="screen" id="s-consent">
+  <h1>注意实验 · Flanker 距离 + 图形比例判断</h1>
+  <p class="muted">工程心理学 ·「感知与注意」课堂实验 · 约 12–15 分钟</p>
+
+  <h3>知情同意 · 眼动与实验</h3>
+  <p>本实验室可以用你的笔记本摄像头估计你“在看哪里”（WebGazer.js）。请阅读：</p>
+  <ul>
+    <li><b>视频永不上传。</b>摄像头画面只在你的浏览器里被处理，不连接任何第三方服务器。</li>
+    <li>上传到课程服务器的只有：<b>归一化注视坐标（0–1，相对实验舞台）</b>、所在区域（AOI）编码、按键 / 滑块反应、试次时间。不存原始视频，也不存屏幕像素坐标。</li>
+    <li>数据仅用于课堂教学演示与讨论（全班匿名对比），学期结束后删除。</li>
+    <li>网页眼动精度有限（约 4°），因此实验只使用几个大的兴趣区；<b>仅鼠标模式</b>下记录的其实是光标位置，用于流程演示。</li>
+    <li>你可以拒绝使用摄像头：系统会改用<b>鼠标位置追踪</b>模式，实验流程完全一样。</li>
+  </ul>
+
+  <div class="note">
+    <b>本次要做的两个实验</b><br>
+    <b>实验一 · Flanker 距离</b>：屏幕中央 5 个字母，只判断<b>中间</b>那个（K→<kbd>←</kbd>，H→<kbd>→</kbd>）。两侧干扰字母有时<b>紧贴</b>（2 px）、有时<b>拉开</b>（120 px）。2×2 被试内设计，正式 80 试次。<br>
+    <b>实验二 · 饼图比例判断（Cleveland &amp; McGill, 1984）</b>：判断红色扇形占整张饼图的百分比。一半试次是<b>2D 平面饼图</b>，一半是<b>倾斜透视的 3D 饼图</b>。理论依据是<b>透视错觉</b>：立体图形的投影面积/体积估计违背基本几何规律。预测：3D 的判断误差显著大于 2D，且<b>前景（近端）扇区被高估、后景（远端）扇区被低估</b>。
+  </div>
+
+  <p><label>你的昵称或编号（不要填真实姓名、学号）：<br>
+    <input id="in-pid" placeholder="如 P_小王 或 07" autocomplete="off">
+  </label></p>
+
+  <div style="margin:18px 0;display:flex;gap:12px;flex-wrap:wrap">
+    <button id="btn-cam">启用摄像头眼动</button>
+    <button id="btn-mouse" class="secondary">仅鼠标（拒绝摄像头）</button>
+  </div>
+  <p class="muted" id="cam-status">等待选择…</p>
+  <p class="muted">建议在开始前按 <kbd>F11</kbd> 全屏，并关闭会弹窗的软件。</p>
+</section>
+
+<!-- ==================== 2. 眼动校准 ==================== -->
+<section class="screen" id="s-calibrate" style="display:none">
+  <h2>眼动校准 · 9 点</h2>
+  <p>屏幕上有 <b>9 个金色圆点</b>，每次只出现一个。请<b>眼睛看准圆点中心</b>，然后再点它。9 个都点完就进入菜单。</p>
+  <div id="cal-grid"></div>
+  <p class="muted" id="cal-progress">0 / 9</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    <button id="cal-skip" class="secondary">跳过校准（精度会下降）</button>
+    <button id="cal-back" class="secondary">改用鼠标模式</button>
+  </div>
+</section>
+
+<!-- ==================== 3. 实验菜单 ==================== -->
+<section class="screen" id="s-menu" style="display:none">
+  <div class="menu-header">
+    <div>
+      <h2 style="margin:0">实验菜单</h2>
+      <div class="meta">被试：<b id="m-pid">—</b> ｜ 追踪模式：<b id="m-mode">—</b></div>
+    </div>
+    <button id="m-clear" class="secondary">清除本机数据</button>
+  </div>
+
+  <div class="menu-cards">
+    <div class="card" id="card-flanker">
+      <h3>实验一 · Flanker 距离</h3>
+      <p>中间字母 K 按 <kbd>←</kbd>，H 按 <kbd>→</kbd>。两侧字母忽略。干扰项有时紧贴目标（2 px），有时拉开到 120 px。</p>
+      <p class="muted" style="margin-top:6px">练习 8 试次 + 正式 80 试次 ≈ 6 分钟</p>
+      <div class="footer">
+        <span class="status-tag status-pending" id="st-flanker">未完成</span>
+        <button id="go-flanker">开始</button>
+      </div>
+    </div>
+    <div class="card" id="card-pie">
+      <h3>实验二 · 3D / 2D 饼图比例</h3>
+      <p>判断红色扇形占整张饼图的百分之几。一半是平面 2D 饼图，一半是倾斜透视的 3D 饼图。</p>
+      <p class="muted" style="margin-top:6px">练习 4 试次 + 正式 40 试次 ≈ 5 分钟</p>
+      <div class="footer">
+        <span class="status-tag status-pending" id="st-pie">未完成</span>
+        <button id="go-pie">开始</button>
+      </div>
+    </div>
+  </div>
+
+  <button id="btn-viz" class="viz-btn">📊 查看可视化结果</button>
+  <p class="muted" style="margin-top:16px">两个实验都完成后按钮会亮起。重做实验会覆盖本机的旧数据。进度随时保存在本机（localStorage）。</p>
+</section>
+
+<!-- ==================== 4. 实验舞台 ==================== -->
+<section class="screen wide" id="s-stage">
+  <div id="exp-progress" class="hidden">
+    <div class="exp-progress-bar"><div class="exp-progress-fill"></div></div>
+    <div class="exp-progress-txt"></div>
+  </div>
+  <div id="msg"></div>
+  <div id="fix">+</div>
+  <div id="flanker-row"></div>
+  <div id="pie-wrap">
+    <canvas id="pie-canvas" width="560" height="560"></canvas>
+    <div id="pie-resp">
+      <span class="lab">红色扇形占</span>
+      <span id="pie-val">50</span><span class="unit">%</span>
+      <input id="pie-slider" type="range" min="1" max="99" step="1" value="50">
+      <button id="pie-ok">确认 ⏎</button>
+    </div>
+  </div>
+  <div id="progress"></div>
+  <div id="gaze-indicator"></div>
+  <div id="stage-tip">F11 全屏 · 保持头部不动 · Esc 退出</div>
+</section>
+
+<!-- ==================== 5. 可视化 ==================== -->
+<section class="screen" id="s-viz" style="display:none">
+  <div class="viz-header">
+    <h2 style="margin:0">可视化结果</h2>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button id="vz-export" class="secondary">导出 JSON</button>
+      <button id="vz-back" class="secondary">返回菜单</button>
+    </div>
+  </div>
+  <div id="vz-body"></div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// =====================================================================
+// CHART · 极简 SVG 柱状图库
+// =====================================================================
+const CHART = (function () {
+  'use strict';
+  const GOLD = '#C8A44A', NAVY = '#0D2B5C', MUTED = '#8b97ab', GRID = '#e6eaf1', BLUE = '#5b7fb5', RED = '#d64045';
+  const FONT = '"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif';
+  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const T = (x, y, s, { size = 12, fill = NAVY, anchor = 'middle', weight = 500, halo = false } = {}) =>
+    `<text x="${x}" y="${y}" font-family='${FONT}' font-size="${size}" fill="${fill}" text-anchor="${anchor}" font-weight="${weight}"${halo ? ' stroke="#fff" stroke-width="3.5" paint-order="stroke" stroke-linejoin="round"' : ''}>${esc(s)}</text>`;
+  const wrap = (W, H, body) => `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible" role="img">${body}</svg>`;
+
+  function ticks(max, count = 4) {
+    if (!(max > 0)) return [0, 1];
+    const raw = max / count;
+    const e = Math.pow(10, Math.floor(Math.log10(raw)));
+    const mults = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+    let step = e, k = count;
+    for (const m of mults) {
+      const st = m * e, kk = Math.ceil(max / st - 1e-9);
+      if (kk < 2) continue;
+      step = st; k = kk;
+      if (kk >= 2 && kk <= count + 1) break;
+    }
+    const out = [];
+    for (let i = 0; i <= k; i++) out.push(+(i * step).toFixed(6));
+    return out;
+  }
+
+  // 普通柱状图（可带误差棒）
+  function barChart({ items, fmt = (v) => Math.round(v), height = 300, ref = null, refLabel = '', barColor = GOLD }) {
+    const W = 680, H = height, L = 68, R = 16, Tp = 26, B = 54;
+    const iw = W - L - R, ih = H - Tp - B;
+    const m0 = Math.max(...items.map((d) => (d.value || 0) + (d.sd || 0)));
+    const tk = ticks((m0 > 0 ? m0 : 1) * 1.06, 4);
+    const top = tk[tk.length - 1];
+    const y = (v) => Tp + ih - (v / top) * ih;
+    const step = iw / items.length;
+    const bw = Math.min(110, step * 0.54);
+    let s = '';
+    tk.forEach((v) => {
+      s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="${GRID}" stroke-width="1"/>`;
+      s += T(L - 10, y(v), fmt(v), { anchor: 'end', fill: MUTED, size: 11 });
+    });
+    if (ref != null) {
+      s += `<line x1="${L}" x2="${W - R}" y1="${y(ref)}" y2="${y(ref)}" stroke="${NAVY}" stroke-width="1.5" stroke-dasharray="5 4" opacity=".5"/>`;
+      if (refLabel) s += T(W - R, y(ref) - 6, refLabel, { anchor: 'end', fill: NAVY, size: 11 });
+    }
+    items.forEach((d, i) => {
+      const cx = L + step * (i + 0.5);
+      const v = d.value || 0;
+      const h = Math.max(2, ih - (y(v) - Tp));
+      s += `<rect x="${cx - bw / 2}" y="${y(v)}" width="${bw}" height="${h}" rx="5" fill="${d.color || barColor}"/>`;
+      if (d.sd) {
+        const yy = y(v + d.sd), cap = 9;
+        s += `<line x1="${cx}" x2="${cx}" y1="${y(v)}" y2="${yy}" stroke="${NAVY}" stroke-width="1.6" opacity=".6"/>`;
+        s += `<line x1="${cx - cap}" x2="${cx + cap}" y1="${yy}" y2="${yy}" stroke="${NAVY}" stroke-width="1.6" opacity=".6"/>`;
+      }
+      s += T(cx, y(v) - (d.sd ? 13 : 8), fmt(v), { size: 13, weight: 700, halo: true });
+      s += T(cx, H - B + 20, d.label, { size: 12, fill: '#44506a' });
+      if (d.note) s += T(cx, H - B + 37, d.note, { size: 11, fill: MUTED });
+    });
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="#c9d2e0" stroke-width="1.2"/>`;
+    return wrap(W, H, s);
+  }
+
+  // 分组柱状图
+  function groupedBar({ groups, series, fmt = (v) => Math.round(v), height = 310, colors = [GOLD, BLUE], yNote = '' }) {
+    const W = 680, H = height, L = 68, R = 16, Tp = 44, B = 54;
+    const iw = W - L - R, ih = H - Tp - B;
+    const all = series.flatMap((se) => groups.map((g) => se.values[g] || 0));
+    const tk = ticks((Math.max(...all) > 0 ? Math.max(...all) : 1) * 1.06, 4);
+    const top = tk[tk.length - 1];
+    const y = (v) => Tp + ih - (v / top) * ih;
+    const gstep = iw / groups.length;
+    const bw = Math.min(58, (gstep * 0.62) / series.length);
+    let s = '';
+    tk.forEach((v) => {
+      s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="${GRID}" stroke-width="1"/>`;
+      s += T(L - 10, y(v), fmt(v), { anchor: 'end', fill: MUTED, size: 11 });
+    });
+    groups.forEach((g, gi) => {
+      const cx = L + gstep * (gi + 0.5);
+      series.forEach((se, si) => {
+        const v = se.values[g] || 0;
+        const x = cx - (series.length * bw) / 2 + si * bw;
+        const h = Math.max(2, ih - (y(v) - Tp));
+        s += `<rect x="${x + 3}" y="${y(v)}" width="${bw - 6}" height="${h}" rx="4" fill="${se.color || colors[si]}"/>`;
+        s += T(x + bw / 2, y(v) - 7, fmt(v), { size: 11.5, weight: 700, halo: true });
+      });
+      s += T(cx, H - B + 20, g, { size: 12, fill: '#44506a' });
+    });
+    series.forEach((se, si) => {
+      const x = L + si * 160;
+      s += `<rect x="${x}" y="12" width="12" height="12" rx="3" fill="${se.color || colors[si]}"/>`;
+      s += T(x + 18, 22, se.name, { anchor: 'start', size: 12, fill: '#44506a' });
+    });
+    if (yNote) s += T(W - R, 22, yNote, { anchor: 'end', size: 11, fill: MUTED });
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="#c9d2e0" stroke-width="1.2"/>`;
+    return wrap(W, H, s);
+  }
+
+  // 有正负的发散柱状图（零线居中），用于“高估 / 低估”
+  function diverging({ groups, series, fmt = (v) => (v > 0 ? '+' : '') + v.toFixed(1), height = 330, colors = [GOLD, BLUE] }) {
+    const W = 680, H = height, L = 68, R = 16, Tp = 46, B = 56;
+    const iw = W - L - R, ih = H - Tp - B;
+    const all = series.flatMap((se) => groups.map((g) => Math.abs(se.values[g] || 0)));
+    const m = Math.max(1e-6, ...all) * 1.25;
+    const y = (v) => Tp + ih - ((v + m) / (2 * m)) * ih;
+    const gstep = iw / groups.length;
+    const bw = Math.min(58, (gstep * 0.62) / series.length);
+    let s = '';
+    [-m, -m / 2, 0, m / 2, m].forEach((v) => {
+      s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="${v === 0 ? '#9fb0c8' : GRID}" stroke-width="${v === 0 ? 1.4 : 1}"/>`;
+      s += T(L - 10, y(v) + 4, fmt(v), { anchor: 'end', fill: MUTED, size: 11 });
+    });
+    groups.forEach((g, gi) => {
+      const cx = L + gstep * (gi + 0.5);
+      series.forEach((se, si) => {
+        const v = se.values[g] || 0;
+        const x = cx - (series.length * bw) / 2 + si * bw;
+        const y0 = y(0), y1 = y(v);
+        s += `<rect x="${x + 3}" y="${Math.min(y0, y1)}" width="${bw - 6}" height="${Math.max(2, Math.abs(y1 - y0))}" rx="3" fill="${se.color || colors[si]}"/>`;
+        s += T(x + bw / 2, v >= 0 ? y1 - 7 : y1 + 15, fmt(v), { size: 11, weight: 700, halo: true });
+      });
+      s += T(cx, H - B + 20, g, { size: 12, fill: '#44506a' });
+    });
+    series.forEach((se, si) => {
+      const x = L + si * 160;
+      s += `<rect x="${x}" y="12" width="12" height="12" rx="3" fill="${se.color || colors[si]}"/>`;
+      s += T(x + 18, 22, se.name, { anchor: 'start', size: 12, fill: '#44506a' });
+    });
+    s += T(W - R, H - B + 44, '↑ 高估（选了更大的值）　　↓ 低估', { anchor: 'end', size: 11, fill: MUTED });
+    return wrap(W, H, s);
+  }
+
+  return { barChart, groupedBar, diverging, GOLD, NAVY, BLUE, RED };
+})();
+
+// =====================================================================
+// ONE_EURO · One-Euro 滤波（平滑眼动坐标）
+// =====================================================================
+const ONE_EURO = (function () {
+  'use strict';
+  class LowPass {
+    constructor() { this.s = null; }
+    filter(x, a) { this.s = this.s === null ? x : a * x + (1 - a) * this.s; return this.s; }
+  }
+  const alpha = (cutoff, dt) => { const tau = 1 / (2 * Math.PI * cutoff); return 1 / (1 + tau / dt); };
+  class OneEuro {
+    constructor({ minCutoff = 0.6, beta = 0.004, dCutoff = 1.0 } = {}) {
+      Object.assign(this, { minCutoff, beta, dCutoff });
+      this.x = new LowPass(); this.dx = new LowPass(); this.t = null;
+    }
+    reset() { this.x = new LowPass(); this.dx = new LowPass(); this.t = null; }
+    filter(v, tMs) {
+      const dt = this.t === null ? 1 / 30 : Math.max(1e-3, (tMs - this.t) / 1000);
+      this.t = tMs;
+      const prev = this.x.s;
+      const d = prev === null ? 0 : (v - prev) / dt;
+      const ed = this.dx.filter(d, alpha(this.dCutoff, dt));
+      const cutoff = this.minCutoff + this.beta * Math.abs(ed);
+      return this.x.filter(v, alpha(cutoff, dt));
+    }
+  }
+  class OneEuro2D {
+    constructor(opts) { this.fx = new OneEuro(opts); this.fy = new OneEuro(opts); }
+    reset() { this.fx.reset(); this.fy.reset(); }
+    filter(x, y, t) { return [this.fx.filter(x, t), this.fy.filter(y, t)]; }
+  }
+  return { OneEuro, OneEuro2D };
+})();
+
+// =====================================================================
+// GAZE · 眼动 / 鼠标追踪中枢
+// =====================================================================
+const GAZE = (function () {
+  'use strict';
+  const SAMPLE_MS = 66;   // ≈15 Hz
+  const STALE_MS = 400;
+
+  const hub = {
+    mode: null, cur: null, wg: null, stageEl: null,
+    filter: new ONE_EURO.OneEuro2D({ minCutoff: 0.6, beta: 0.004 }),
+    rec: null, _onMouse: null,
+
+    setStage(el) { this.stageEl = el; },
+    label() { return this.mode === 'webgazer' ? '👁 webcam' : '🖱 mouse'; },
+
+    startMouse() {
+      this.mode = 'mouse';
+      if (!this._onMouse) {
+        this._onMouse = (e) => { if (this.mode === 'mouse') this.cur = { x: e.clientX, y: e.clientY, t: performance.now() }; };
+        document.addEventListener('mousemove', this._onMouse);
+      }
+    },
+
+    async startWebGazer() {
+      // 相对路径优先：兼容 GitHub Pages 的子路径部署（用户名.github.io/仓库/）
+      const trySrc = [
+        'vendor/webgazer/webgazer.js',
+        '/vendor/webgazer/webgazer.js',
+        'vendor/webgazer.js',
+        '/vendor/webgazer/webgazer.min.js',
+      ];
+      let loaded = false;
+      for (const src of trySrc) {
+        try {
+          await new Promise((res, rej) => {
+            const s = document.createElement('script');
+            s.src = src; s.onload = res; s.onerror = rej;
+            document.head.appendChild(s);
+          });
+          if (window.webgazer) { loaded = true; break; }
+        } catch (e) { console.warn('[gaze] 加载失败：', src, e.message); }
+      }
+      if (!loaded) throw new Error('未找到 vendor/webgazer/webgazer.js（请确认通过 http(s):// 打开本页且 vendor 目录已部署；file:// 直开不支持摄像头）');
+      const wg = window.webgazer;
+      // 自托管人脸模型（不连第三方 CDN）；相对当前页面解析，兼容 GitHub Pages 子路径
+      try {
+        wg.params.faceMeshSolutionPath = new URL('vendor/webgazer/mediapipe/face_mesh', location.href).href.replace(/\/$/, '');
+      } catch (e) { console.warn('[gaze] faceMeshSolutionPath 设置失败：', e); }
+      if (wg.applyKalmanFilter) wg.applyKalmanFilter(false);
+      wg.saveDataAcrossSessions(false);
+      wg.showVideoPreview(true);
+      wg.showPredictionPoints(false);
+      wg.setGazeListener((data) => {
+        if (!data) return;
+        const t = performance.now();
+        const [fx, fy] = this.filter.filter(data.x, data.y, t);
+        this.cur = { x: fx, y: fy, t };
+      });
+      const beginP = wg.begin();
+      const timeoutP = new Promise((_, rej) => setTimeout(() => rej(new Error('WebGazer begin() 超时（15 秒）')), 15000));
+      await Promise.race([beginP, timeoutP]);
+      this.wg = wg;
+      this.mode = 'webgazer';
+    },
+
+    clearCalibration() {
+      if (this.wg && this.wg.clearData) { try { this.wg.clearData(); } catch (e) { console.warn(e); } }
+      this.filter.reset();
+      this.cur = null;
+    },
+
+    toNorm(cx, cy) {
+      const r = this.stageEl.getBoundingClientRect();
+      const x = (cx - r.left) / r.width;
+      const y = (cy - r.top) / r.height;
+      if (x < -0.05 || x > 1.05 || y < -0.05 || y > 1.05) return [1.2, 1.2];
+      return [Math.min(1, Math.max(0, x)), Math.min(1, Math.max(0, y))];
+    },
+
+    startRecording() {
+      this.stopRecording();
+      const t0 = performance.now();
+      const rec = { t0, samples: [], lost: 0, ticks: 0 };
+      rec.timer = setInterval(() => {
+        const now = performance.now();
+        rec.ticks++;
+        const c = this.cur;
+        if (!c || (this.mode === 'webgazer' && now - c.t > STALE_MS)) {
+          rec.lost++;
+          rec.samples.push(Math.round(now - t0), -1, -1);
+          return;
+        }
+        const [x, y] = this.toNorm(c.x, c.y);
+        rec.samples.push(Math.round(now - t0), +x.toFixed(3), +y.toFixed(3));
+      }, SAMPLE_MS);
+      this.rec = rec;
+      return rec;
+    },
+
+    stopRecording() {
+      if (!this.rec) return null;
+      clearInterval(this.rec.timer);
+      const r = this.rec;
+      this.rec = null;
+      const dur = r.ticks * SAMPLE_MS;
+      return {
+        samples: r.samples,
+        lost: r.lost,
+        ticks: r.ticks,
+        hz: dur > 0 ? +(r.ticks / (dur / 1000)).toFixed(1) : 0,
+      };
+    },
+  };
+  return hub;
+})();
+
+// =====================================================================
+// AOI · 兴趣区换算与停留时间
+// =====================================================================
+function padRect(r, p) {
+  if (!r) return null;
+  return { left: r.left - p, top: r.top - p, right: r.right + p, bottom: r.bottom + p };
+}
+function boxesToNorm(boxes) {
+  const st = document.getElementById('s-stage').getBoundingClientRect();
+  const out = {};
+  for (const k in boxes) {
+    const r = boxes[k];
+    if (!r) continue;
+    out[k] = [
+      (r.left - st.left) / st.width,
+      (r.top - st.top) / st.height,
+      (r.right - st.left) / st.width,
+      (r.bottom - st.top) / st.height,
+    ];
+  }
+  return out;
+}
+function classifyRect(x, y, boxes) {
+  if (x < 0 || x > 1 || y < 0 || y > 1) return 'off';
+  for (const k in boxes) {
+    const [x0, y0, x1, y1] = boxes[k];
+    if (x >= x0 && x <= x1 && y >= y0 && y <= y1) return k;
+  }
+  return 'off';
+}
+// 用任意分类函数统计各 AOI 停留时间（ms）
+function computeAOIBy(samples, fn) {
+  const time = {};
+  let lastT = null, lastA = null;
+  for (let i = 0; i < samples.length; i += 3) {
+    const t = samples[i], x = samples[i + 1], y = samples[i + 2];
+    const a = (x < 0) ? 'off' : fn(x, y);
+    if (lastT != null) time[lastA] = (time[lastA] || 0) + (t - lastT);
+    lastT = t; lastA = a;
+  }
+  return time;
+}
+const computeAOITime = (samples, boxes) => computeAOIBy(samples, (x, y) => classifyRect(x, y, boxes));
+
+// =====================================================================
+// 配置 / 工具
+// =====================================================================
+const PROJECT = new URLSearchParams(location.search).get('project') || 'N2DRAL';  // 课程项目码
+const LAB = /attention-lab|127\.0\.0\.1|localhost/.test(location.host)
+  ? location.origin
+  : 'https://attention-lab-production.up.railway.app';
+
+const EXP_FLANKER = 'flanker_distance';
+const EXP_PIE     = 'pie_3d_2d';
+
+// 实验一
+const F_PER_CELL = 20;      // 每条件正式试次
+const F_PRACTICE = 2;       // 每条件练习试次
+const F_FIX_MS   = 500;
+const F_TIMEOUT  = 1500;
+const F_FB_MS    = 300;
+const F_ITI_MS   = 350;
+
+// 实验二
+const P_VALUES    = [15, 22, 30, 38, 45];      // 5 个真实占比
+const P_POS       = [                          // 4 个扇区方位（canvas 角度，0°=右，90°=下）
+  { k: 'front', deg: 90,  zh: '前景' },
+  { k: 'back',  deg: 270, zh: '后景' },
+  { k: 'right', deg: 0,   zh: '右侧' },
+  { k: 'left',  deg: 180, zh: '左侧' },
+];
+const P_PER_VIEW = P_VALUES.length * P_POS.length;   // 20 → 2 视野 × 20 = 40
+const P_PRACTICE_PER_VIEW = 2;
+const P_TOL      = 5;        // |误差| ≤ 5% 记作“判断正确”
+const P_TIMEOUT  = 15000;
+const P_FIX_MS   = 500;
+const P_ITI_MS   = 350;
+
+const SESSION_KEY = 'attn_lab_v5';
+
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const mean = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+function stats(a) {
+  const v = a.filter(x => x != null && !isNaN(x));
+  if (!v.length) return { n: 0, m: null, sd: null, se: null };
+  const m = mean(v);
+  const sd = Math.sqrt(v.reduce((s, x) => s + (x - m) ** 2, 0) / (v.length > 1 ? v.length - 1 : 1));
+  return { n: v.length, m, sd, se: v.length > 1 ? sd / Math.sqrt(v.length) : null };
+}
+function toast(msg, ms = 3200) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+function getSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } }
+function saveSession(s) { try { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch (e) { console.warn(e); } }
+
+// 左上角进度条
+function updateExpProgress(cur, total, label, practice) {
+  const el = $('exp-progress');
+  if (!el) return;
+  el.classList.remove('hidden');
+  const fill = el.querySelector('.exp-progress-fill');
+  const txt = el.querySelector('.exp-progress-txt');
+  if (practice) {
+    el.classList.add('practice');
+    fill.style.width = '0%';
+    txt.textContent = `练习 · ${label}  ${cur} / ${total}`;
+  } else {
+    el.classList.remove('practice');
+    const pct = Math.round((cur / total) * 100);
+    fill.style.width = pct + '%';
+    txt.textContent = `${label}  ${cur} / ${total}  ·  ${pct}%`;
+  }
+}
+function hideExpProgress() { $('exp-progress').classList.add('hidden'); }
+
+// =====================================================================
+// 屏幕切换
+// =====================================================================
+function showScreen(id) {
+  for (const s of document.querySelectorAll('section.screen')) s.style.display = 'none';
+  const el = $(id);
+  if (!el) return;
+  el.style.display = '';
+  if (id === 's-stage') el.classList.add('show');
+  else el.classList.remove('show');
+}
+
+// =====================================================================
+// 同意页 → 追踪模式
+// =====================================================================
+$('btn-mouse').onclick = () => {
+  const pid = $('in-pid').value.trim();
+  if (!pid) return alert('请先填写昵称或编号');
+  let s = getSession();
+  if (!s || s.participant !== pid) s = { participant: pid, eyeMode: 'mouse', results: {} };
+  else s.eyeMode = 'mouse';
+  saveSession(s);
+  GAZE.setStage($('s-stage'));
+  GAZE.startMouse();
+  gotoMenu();
+};
+
+$('btn-cam').onclick = async () => {
+  const pid = $('in-pid').value.trim();
+  if (!pid) return alert('请先填写昵称或编号');
+  $('cam-status').textContent = '正在请求摄像头权限（最多 15 秒）…';
+  GAZE.setStage($('s-stage'));
+
+  let ok = false;
+  try {
+    await GAZE.startWebGazer();
+    ok = true;
+    $('cam-status').textContent = '✓ 摄像头已启动，进入 9 点校准';
+  } catch (e) {
+    console.error('[btn-cam] 启动失败：', e);
+    $('cam-status').textContent = '摄像头启动失败：' + e.message + '，改用鼠标模式';
+  }
+
+  let s = getSession();
+  if (!s || s.participant !== pid) s = { participant: pid, results: {} };
+  s.eyeMode = ok ? 'webgazer' : 'mouse';
+  saveSession(s);
+
+  if (ok) { showScreen('s-calibrate'); startCalibration(); }
+  else { GAZE.startMouse(); gotoMenu(); }
+};
+
+// =====================================================================
+// 9 点校准
+// =====================================================================
+let calFinished = false;
+function startCalibration() {
+  calFinished = false;
+  GAZE.clearCalibration();
+  const grid = $('cal-grid');
+  const pts = [];
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) pts.push({ x: 12 + c * 38, y: 15 + r * 35 });
+  shuffle(pts);
+
+  let idx = 0;
+  const show = () => {
+    if (idx >= pts.length) {
+      grid.innerHTML = '';
+      $('cal-progress').textContent = '✓ 校准完成，进入菜单';
+      if (!calFinished) { calFinished = true; setTimeout(() => gotoMenu(), 700); }
+      return;
+    }
+    const p = pts[idx];
+    grid.innerHTML = `<button class="cal-dot" style="left:${p.x}%;top:${p.y}%">${idx + 1}</button>`;
+    $('cal-progress').textContent = `${idx + 1} / ${pts.length} — 看准圆点，再点它`;
+    grid.querySelector('.cal-dot').onclick = () => { idx++; show(); };
+  };
+
+  $('cal-skip').onclick = () => { if (calFinished) return; calFinished = true; grid.innerHTML = ''; gotoMenu(); };
+  $('cal-back').onclick = () => {
+    if (calFinished) return;
+    calFinished = true;
+    if (GAZE.wg && GAZE.wg.end) { try { GAZE.wg.end(); } catch {} }
+    GAZE.wg = null;
+    const s = getSession();
+    if (s) { s.eyeMode = 'mouse'; saveSession(s); }
+    GAZE.startMouse();
+    gotoMenu();
+  };
+  show();
+}
+
+// =====================================================================
+// 菜单
+// =====================================================================
+function gotoMenu() {
+  const s = getSession();
+  if (!s) { showScreen('s-consent'); return; }
+  if (!s.results) s.results = {};
+  $('m-pid').textContent = s.participant;
+  $('m-mode').textContent = s.eyeMode === 'webgazer' ? '摄像头眼动' : '鼠标位置';
+
+  const doneF = !!(s.results[EXP_FLANKER] && s.results[EXP_FLANKER].trials);
+  const doneP = !!(s.results[EXP_PIE] && s.results[EXP_PIE].trials);
+  const setCard = (stId, btnId, cardId, done) => {
+    $(stId).textContent = done ? '✓ 已完成' : '未完成';
+    $(stId).className = 'status-tag ' + (done ? 'status-done' : 'status-pending');
+    $(btnId).textContent = done ? '重做' : '开始';
+    $(cardId).classList.toggle('done', done);
+  };
+  setCard('st-flanker', 'go-flanker', 'card-flanker', doneF);
+  setCard('st-pie', 'go-pie', 'card-pie', doneP);
+  $('btn-viz').classList.toggle('show', doneF && doneP);
+
+  hideExpProgress();
+  showScreen('s-menu');
+}
+
+$('m-clear').onclick = () => {
+  if (!confirm('确定清除本机全部数据？未提交的试次与本地结果都会丢失。')) return;
+  localStorage.removeItem(SESSION_KEY);
+  if (GAZE.wg && GAZE.wg.end) { try { GAZE.wg.end(); } catch {} }
+  GAZE.wg = null;
+  showScreen('s-consent');
+  $('cam-status').textContent = '等待选择…';
+};
+
+// =====================================================================
+// 实验一 · Flanker 距离
+// =====================================================================
+// 2×2 被试内：一致性(cong) × 距离(dist)；每个条件内 K/H 交替 → 平衡
+function makeFlankerTrials(perCell) {
+  const list = [];
+  for (let k = 0; k < perCell; k++) {
+    for (const dist of ['near', 'far']) {
+      for (const cong of [1, 0]) {
+        const target = (k % 2 === 0) ? 'K' : 'H';
+        const flanker = cong ? target : (target === 'K' ? 'H' : 'K');
+        list.push({
+          cond: `${dist}_${cong ? 'cong' : 'incong'}`,
+          dist, cong,
+          target, flanker,
+          gap_req: dist === 'near' ? 2 : 120,
+        });
+      }
+    }
+  }
+  return shuffle(list);
+}
+
+function flankerScale() {
+  // 让 120 px 的远端条件在窄屏上也放得下
+  const avail = Math.max(320, Math.min(window.innerWidth, window.innerHeight * 2.2) - 48);
+  return Math.min(1, avail / 880);
+}
+
+function renderFlanker(t) {
+  const s = flankerScale();
+  const row = $('flanker-row');
+  row.style.fontSize = (74 * s) + 'px';
+  row.style.gap = (t.gap_req * s) + 'px';
+  row.innerHTML =
+    `<span class="flank">${t.flanker}</span>` +
+    `<span class="flank">${t.flanker}</span>` +
+    `<span class="target">${t.target}</span>` +
+    `<span class="flank">${t.flanker}</span>` +
+    `<span class="flank">${t.flanker}</span>`;
+  return s;
+}
+
+function flankerAOIBoxes(scale) {
+  const row = $('flanker-row');
+  const tgt = row.querySelector('.target');
+  const flanks = [...row.querySelectorAll('.flank')];
+  const tRect = padRect(tgt.getBoundingClientRect(), 10);
+  let fl = null;
+  for (const f of flanks) {
+    const r = f.getBoundingClientRect();
+    if (!fl) fl = { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+    else {
+      fl.left = Math.min(fl.left, r.left);
+      fl.top = Math.min(fl.top, r.top);
+      fl.right = Math.max(fl.right, r.right);
+      fl.bottom = Math.max(fl.bottom, r.bottom);
+    }
+  }
+  return boxesToNorm({ target: tRect, flank: padRect(fl, 8) });
+}
+
+function measureGap() {
+  const row = $('flanker-row');
+  const tgt = row.querySelector('.target').getBoundingClientRect();
+  const fl = row.querySelectorAll('.flank');
+  const leftGap = tgt.left - fl[1].getBoundingClientRect().right;
+  const rightGap = fl[2].getBoundingClientRect().left - tgt.right;
+  return +(((leftGap + rightGap) / 2).toFixed(1));
+}
+
+function waitFlankerKey(t0) {
+  return new Promise(res => {
+    const keys = ['ArrowLeft', 'ArrowRight'];
+    const onKey = (e) => {
+      if (!keys.includes(e.key) || e.repeat) return;
+      e.preventDefault();
+      done({ key: e.key, rt: performance.now() - t0 });
+    };
+    const done = (r) => { window.removeEventListener('keydown', onKey); clearTimeout(to); res(r); };
+    const to = setTimeout(() => done({ key: null, rt: null }), F_TIMEOUT);
+    window.addEventListener('keydown', onKey);
+  });
+}
+
+async function runFlankerTrial(t, idx) {
+  $('msg').textContent = '';
+  $('flanker-row').innerHTML = '';
+  $('pie-wrap').classList.remove('show');
+  $('fix').classList.remove('hidden');
+
+  // 1) 注视点 500 ms
+  await sleep(F_FIX_MS);
+  $('fix').classList.add('hidden');
+
+  // 2) 呈现 5 个字母，同时启动追踪
+  const scale = renderFlanker(t);
+  const gapActual = measureGap();
+  const boxes = flankerAOIBoxes(scale);
+  GAZE.startRecording();
+  $('gaze-indicator').textContent = GAZE.label();
+
+  await new Promise(requestAnimationFrame);
+  const t0 = performance.now();
+
+  // 3) 等按键或 1500 ms 超时
+  const r = await waitFlankerKey(t0);
+  const rec = GAZE.stopRecording();
+  const rowRect = $('flanker-row').getBoundingClientRect();
+
+  // 4) 反馈
+  const correctKey = t.target === 'K' ? 'ArrowLeft' : 'ArrowRight';
+  const correct = r.key === correctKey ? 1 : 0;
+  $('flanker-row').innerHTML = '';
+  if (!correct) {
+    $('msg').textContent = r.key ? '✗' : '太慢了';
+    await sleep(F_FB_MS);
+    $('msg').textContent = '';
+  }
+
+  // 5) 试次间间隔
+  await sleep(F_ITI_MS);
+
+  const aoi = computeAOITime(rec.samples, boxes);
+  return {
+    trial: idx,
+    cond: t.cond, dist: t.dist, cong: t.cong,
+    target: t.target, flanker: t.flanker,
+    gap_req: t.gap_req, gap_actual: gapActual, display_scale: +scale.toFixed(3),
+    rt: r.rt == null ? null : Math.round(r.rt),
+    correct, timeout: r.key ? 0 : 1, response: r.key || 'NA',
+    fix_ms: F_FIX_MS,
+    row_w: Math.round(rowRect.width),
+    gaze_n: rec.ticks, gaze_lost: rec.lost, gaze_hz: rec.hz,
+    aoi_target: Math.round(aoi.target || 0),
+    aoi_flank: Math.round(aoi.flank || 0),
+    aoi_off: Math.round(aoi.off || 0),
+    gaze_samples: rec.samples,
+  };
+}
+
+async function runFlanker(trials, practice) {
+  $('pie-wrap').classList.remove('show');
+  $('flanker-row').innerHTML = '';
+  $('stage-tip').textContent = '中间字母 K → ←　｜　H → →';
+  $('msg').innerHTML = practice
+    ? '练习阶段<br><span style="font-size:15px;color:#c9d2e0">只看中间字母：K 按 ←，H 按 →；两侧字母忽略</span>'
+    : '正式阶段<br><span style="font-size:15px;color:#c9d2e0">只看中间字母：K 按 ←，H 按 →；要又快又准</span>';
+  await sleep(2200);
+  $('msg').textContent = '';
+
+  const out = [];
+  for (let i = 0; i < trials.length; i++) {
+    updateExpProgress(i + 1, trials.length, 'Flanker', practice);
+    $('progress').textContent = `${i + 1} / ${trials.length}`;
+    out.push(await runFlankerTrial(trials[i], i + 1));
+  }
+  $('progress').textContent = '';
+  return out;
+}
+
+// =====================================================================
+// 实验二 · Cleveland–McGill (1984) 比例判断：3D 透视饼图 vs 2D 平面饼图
+// =====================================================================
+const PIE_GEO = { cx: 0, cy: 0, rx: 0, ry: 0, depth: 0, a0: 0, a1: 0, view: '2d' };
+
+// 生成试次：每个 (真实占比 × 扇区方位) 各出现一次 2D 与一次 3D → 完全配对
+function makePieTrials(perView, practice) {
+  const vals = practice ? [18, 27, 41, 50, 33] : P_VALUES;
+  const pool = [];
+  for (const v of vals) for (const p of P_POS) pool.push({ value: v, pos: p.k, deg: p.deg });
+  const use = shuffle(pool.slice()).slice(0, Math.min(perView, pool.length));
+  const out = [];
+  for (const view of ['2d', '3d']) {
+    for (const u of use) {
+      out.push({ cond: view, view, true_pct: u.value, pos: u.pos, pos_deg: u.deg });
+    }
+  }
+  return shuffle(out);
+}
+
+function bandPath(ctx, cx, cy, rx, ry, depth, lo, hi) {
+  const N = 64;
+  ctx.beginPath();
+  for (let i = 0; i <= N; i++) { const a = lo + (hi - lo) * i / N; ctx.lineTo(cx + rx * Math.cos(a), cy + ry * Math.sin(a)); }
+  for (let i = N; i >= 0; i--) { const a = lo + (hi - lo) * i / N; ctx.lineTo(cx + rx * Math.cos(a), cy + ry * Math.sin(a) + depth); }
+  ctx.closePath();
+}
+
+/**
+ * 绘制饼图
+ * view: '2d' 平面正圆 ｜ '3d' 倾斜投影（椭圆 + 侧壁厚度）
+ * 注：椭圆是圆的仿射投影，相对面积在几何上仍守恒 —— 3D 的偏差来自
+ *     透视/厚度这类深度线索造成的知觉错觉，正是 C&M 关心的效应。
+ */
+function drawPieChart(view, pct, posDeg) {
+  const canvas = $('pie-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const RED = '#d64045', RED_D = '#9e2b30', DISK = '#e9edf4', DISK_D = '#b9c2d3', RIM = '#0D2B5C';
+  const is3d = view === '3d';
+  const R = Math.min(W, H * 1.12) / 2 - 46;
+  const span = (pct / 100) * Math.PI * 2;
+  const a0 = (posDeg * Math.PI / 180) - span / 2;
+
+  const rx = R;
+  const ry = is3d ? R * 0.52 : R;
+  const depth = is3d ? Math.round(R * 0.30) : 0;
+  const cx = W / 2;
+  const cy = is3d ? (H / 2 - depth / 2) : H / 2;
+
+  if (is3d) {
+    // 底面
+    ctx.beginPath(); ctx.ellipse(cx, cy + depth, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = DISK_D; ctx.fill();
+    // 侧壁（整个前半圈）
+    bandPath(ctx, cx, cy, rx, ry, depth, 0, Math.PI);
+    ctx.fillStyle = DISK_D; ctx.fill();
+    // 高亮扇区的前壁
+    const TAU = Math.PI * 2;
+    const a0n = ((a0 % TAU) + TAU) % TAU, a1n = a0n + span;
+    for (const k of [0, 1]) {
+      const lo = Math.max(a0n, k * TAU), hi = Math.min(a1n, k * TAU + Math.PI);
+      if (hi - lo > 0.01) { bandPath(ctx, cx, cy, rx, ry, depth, lo, hi); ctx.fillStyle = RED_D; ctx.fill(); }
+    }
+  }
+
+  // 顶面
+  ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fillStyle = DISK; ctx.fill();
+
+  // 高亮扇区
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.ellipse(cx, cy, rx, ry, 0, a0, a0 + span);
+  ctx.closePath();
+  ctx.fillStyle = RED; ctx.fill();
+
+  // 轮廓
+  ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = RIM; ctx.lineWidth = 2; ctx.stroke();
+
+  // 扇区两条半径
+  ctx.strokeStyle = RIM; ctx.lineWidth = 1.6;
+  [a0, a0 + span].forEach(a => {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + rx * Math.cos(a), cy + ry * Math.sin(a));
+    ctx.stroke();
+  });
+
+  Object.assign(PIE_GEO, { cx, cy, rx, ry, depth, a0, a1: a0 + span, view });
+}
+
+// 饼图 AOI：sector（红色扇形）/ chart（饼图其余部分）/ resp（作答区）/ off
+function pieAOIClassifier(geo) {
+  const canvas = $('pie-canvas');
+  const cRect = canvas.getBoundingClientRect();
+  const sRect = $('s-stage').getBoundingClientRect();
+  const rRect = $('pie-resp').getBoundingClientRect();
+  const k = cRect.width / canvas.width;
+  const TAU = Math.PI * 2;
+
+  return (nx, ny) => {
+    const sx = sRect.left + nx * sRect.width;
+    const sy = sRect.top + ny * sRect.height;
+
+    if (sx >= rRect.left && sx <= rRect.right && sy >= rRect.top && sy <= rRect.bottom) return 'resp';
+    if (!(sx >= cRect.left && sx <= cRect.right && sy >= cRect.top && sy <= cRect.bottom)) return 'off';
+
+    const px = (sx - cRect.left) / k;
+    const py = (sy - cRect.top) / k;
+    const ox = (px - geo.cx) / geo.rx;
+    const oy = (py - geo.cy) / geo.ry;
+    const inTop = ox * ox + oy * oy <= 1.06;
+    const inBottom = geo.depth > 0
+      ? (ox * ox + ((py - geo.cy - geo.depth) / geo.ry) ** 2) <= 1.06
+      : false;
+    if (!inTop && !inBottom) return 'off';
+
+    let a = Math.atan2((py - geo.cy) / geo.ry, (px - geo.cx) / geo.rx);
+    if (a < 0) a += TAU;
+    const s = ((geo.a0 % TAU) + TAU) % TAU;
+    const e = s + (geo.a1 - geo.a0);
+    const inside = (a >= s && a <= e) || (e > TAU && a <= e - TAU);
+    return inside ? 'sector' : 'chart';
+  };
+}
+
+function waitPieResponse(t0) {
+  return new Promise(res => {
+    const slider = $('pie-slider'), out = $('pie-val'), ok = $('pie-ok');
+    let firstMove = null, nAdjust = 0;
+
+    const onInput = () => {
+      out.textContent = slider.value;
+      if (firstMove == null) firstMove = Math.round(performance.now() - t0);
+      nAdjust++;
+    };
+    const onOk = () => finish('click');
+    const onKey = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); finish('key'); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); slider.value = Math.max(1, +slider.value - 1); onInput(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); slider.value = Math.min(99, +slider.value + 1); onInput(); }
+    };
+    const cleanup = () => {
+      slider.removeEventListener('input', onInput);
+      ok.removeEventListener('click', onOk);
+      window.removeEventListener('keydown', onKey);
+      clearTimeout(to);
+    };
+    const finish = (via) => {
+      const rt = Math.round(performance.now() - t0);
+      const value = +slider.value;
+      cleanup();
+      res({ value, rt, first_move_ms: firstMove, n_adjust: nAdjust, via, timeout: 0 });
+    };
+    const to = setTimeout(() => { cleanup(); res({ value: null, rt: null, first_move_ms: firstMove, n_adjust: nAdjust, via: 'timeout', timeout: 1 }); }, P_TIMEOUT);
+
+    slider.addEventListener('input', onInput);
+    ok.addEventListener('click', onOk);
+    window.addEventListener('keydown', onKey);
+  });
+}
+
+async function runPieTrial(t, idx) {
+  $('msg').textContent = '';
+  $('pie-wrap').classList.remove('show');
+  $('fix').classList.remove('hidden');
+
+  await sleep(P_FIX_MS);
+  $('fix').classList.add('hidden');
+
+  // 呈现饼图 + 作答控件
+  drawPieChart(t.view, t.true_pct, t.pos_deg);
+  $('pie-wrap').classList.add('show');
+  $('pie-slider').value = 50;          // 固定初值，避免被试间锚定差异
+  $('pie-val').textContent = '50';
+  $('gaze-indicator').textContent = GAZE.label();
+
+  const cls = pieAOIClassifier({ ...PIE_GEO });
+  GAZE.startRecording();
+
+  await new Promise(requestAnimationFrame);
+  const t0 = performance.now();
+  const r = await waitPieResponse(t0);
+  const rec = GAZE.stopRecording();
+
+  const err = r.value == null ? null : +(r.value - t.true_pct).toFixed(1);
+  const correct = (err != null && Math.abs(err) <= P_TOL) ? 1 : 0;
+
+  $('pie-wrap').classList.remove('show');
+  await sleep(P_ITI_MS);
+
+  const aoi = computeAOIBy(rec.samples, cls);
+  return {
+    trial: idx,
+    cond: t.cond, view: t.view, pos: t.pos, pos_deg: t.pos_deg,
+    true_pct: t.true_pct, resp_pct: r.value,
+    signed_err: err, abs_err: err == null ? null : Math.abs(err),
+    correct, timeout: r.timeout,
+    rt: r.rt, first_move_ms: r.first_move_ms, n_adjust: r.n_adjust, resp_via: r.via,
+    gaze_n: rec.ticks, gaze_lost: rec.lost, gaze_hz: rec.hz,
+    aoi_sector: Math.round(aoi.sector || 0),
+    aoi_chart: Math.round(aoi.chart || 0),
+    aoi_resp: Math.round(aoi.resp || 0),
+    aoi_off: Math.round(aoi.off || 0),
+    gaze_samples: rec.samples,
+  };
+}
+
+async function runPie(trials, practice) {
+  $('flanker-row').innerHTML = '';
+  $('fix').classList.add('hidden');
+  $('stage-tip').textContent = '拖动滑块 → 点「确认」或按 ⏎　（也可用 ← → 微调）';
+  $('gaze-indicator').textContent = '';
+
+  $('msg').innerHTML = practice
+    ? '练习阶段<br><span style="font-size:15px;color:#c9d2e0">红色扇形占整张饼图的百分之几？拖到最接近的数再确认</span>'
+    : '正式阶段<br><span style="font-size:15px;color:#c9d2e0">红色扇形占整张饼图的百分之几？凭第一感觉，不必精算</span>';
+  await sleep(2400);
+  $('msg').textContent = '';
+
+  const out = [];
+  for (let i = 0; i < trials.length; i++) {
+    updateExpProgress(i + 1, trials.length, '饼图比例', practice);
+    $('progress').textContent = `${i + 1} / ${trials.length}`;
+    out.push(await runPieTrial(trials[i], i + 1));
+  }
+  $('progress').textContent = '';
+  return out;
+}
+
+// =====================================================================
+// 数据上传
+// =====================================================================
+async function submitData(participant, experiment, trials) {
+  const res = await fetch(LAB + '/api/hw2/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      project: PROJECT, experiment, participant, trials,
+      meta: { ua: navigator.userAgent.slice(0, 80), w: innerWidth, h: innerHeight, eye: GAZE.mode, v: 'v5' }
+    })
+  });
+  const r = await res.json();
+  if (!r.ok) throw new Error(r.msg || '服务器拒绝');
+  if (r.warnings) console.warn('上传警告：', r.warnings);
+  return r;
+}
+
+async function saveAndUpload(expKey, trials) {
+  const s = getSession();
+  if (!s.results) s.results = {};
+  s.results[expKey] = { trials, submitted: false, at: new Date().toISOString() };
+  saveSession(s);
+  try {
+    const r = await submitData(s.participant, expKey, trials);
+    s.results[expKey].submitted = true;
+    s.results[expKey].participants = r.participants || 0;
+    toast('✓ 数据已上传到课程服务器');
+  } catch (e) {
+    s.results[expKey].error = e.message;
+    toast('提交失败：' + e.message + '（数据已保存在本机，可在结果页导出 JSON）', 5200);
+  }
+  saveSession(s);
+}
+
+// =====================================================================
+// 菜单按钮 · 运行实验
+// =====================================================================
+$('go-flanker').onclick = async () => {
+  const s = getSession();
+  if (!s) return;
+  if (!s.results) s.results = {};
+  if (s.results[EXP_FLANKER] && !confirm('重做会覆盖本机旧数据，继续？')) return;
+  showScreen('s-stage');
+
+  await runFlanker(makeFlankerTrials(F_PRACTICE), true);
+  $('msg').textContent = '练习结束，正式阶段即将开始';
+  await sleep(1400);
+  $('msg').textContent = '';
+
+  const trials = await runFlanker(makeFlankerTrials(F_PER_CELL), false);
+  hideExpProgress();
+  await saveAndUpload(EXP_FLANKER, trials);
+  gotoMenu();
+};
+
+$('go-pie').onclick = async () => {
+  const s = getSession();
+  if (!s) return;
+  if (!s.results) s.results = {};
+  if (s.results[EXP_PIE] && !confirm('重做会覆盖本机旧数据，继续？')) return;
+  showScreen('s-stage');
+
+  await runPie(makePieTrials(P_PRACTICE_PER_VIEW, true), true);
+  $('msg').textContent = '练习结束，正式阶段即将开始';
+  await sleep(1400);
+  $('msg').textContent = '';
+
+  const trials = await runPie(makePieTrials(P_PER_VIEW, false), false);
+  hideExpProgress();
+  await saveAndUpload(EXP_PIE, trials);
+  gotoMenu();
+};
+
+// =====================================================================
+// 统计
+// =====================================================================
+function flankerStats(trials) {
+  const ok = trials.filter(t => t.correct);
+  const cell = (d, c) => stats(ok.filter(t => t.dist === d && t.cong === c).map(t => t.rt));
+  const acc = (d, c) => { const a = trials.filter(t => t.dist === d && t.cong === c); return a.length ? mean(a.map(t => t.correct)) * 100 : null; };
+  const cells = {
+    near_cong: cell('near', 1), near_incong: cell('near', 0),
+    far_cong:  cell('far', 1),  far_incong:  cell('far', 0),
+  };
+  const accs = {
+    near_cong: acc('near', 1), near_incong: acc('near', 0),
+    far_cong:  acc('far', 1),  far_incong:  acc('far', 0),
+  };
+  const effect = (d) => (cells[d + '_incong'].m != null && cells[d + '_cong'].m != null)
+    ? cells[d + '_incong'].m - cells[d + '_cong'].m : null;
+  return {
+    cells, accs,
+    eff_near: effect('near'), eff_far: effect('far'),
+    acc_all: trials.length ? mean(trials.map(t => t.correct)) * 100 : null,
+    timeout_n: trials.filter(t => t.timeout).length,
+    aoi: aoiMean(trials, ['target', 'flank', 'off']),
+    gaze_lost: mean(trials.map(t => t.gaze_lost)),
+    gaze_hz: mean(trials.map(t => t.gaze_hz)),
+    gap_near: mean(trials.filter(t => t.dist === 'near').map(t => t.gap_actual)),
+    gap_far: mean(trials.filter(t => t.dist === 'far').map(t => t.gap_actual)),
+  };
+}
+
+function aoiMean(trials, keys) {
+  const withGaze = trials.filter(t => t.gaze_n > 0);
+  if (!withGaze.length) return null;
+  const out = { n: withGaze.length };
+  for (const k of keys) out[k] = mean(withGaze.map(t => t['aoi_' + k] || 0));
+  return out;
+}
+
+function pieStats(trials) {
+  const valid = trials.filter(t => t.resp_pct != null);
+  const g = (view, field) => stats(valid.filter(t => t.view === view).map(t => t[field]));
+  const hit = (view) => {
+    const a = trials.filter(t => t.view === view);
+    return a.length ? mean(a.map(t => t.correct)) * 100 : null;
+  };
+  const byPos = {};
+  for (const p of P_POS) {
+    byPos[p.k] = {
+      zh: p.zh,
+      m2d: stats(valid.filter(t => t.view === '2d' && t.pos === p.k).map(t => t.signed_err)).m,
+      m3d: stats(valid.filter(t => t.view === '3d' && t.pos === p.k).map(t => t.signed_err)).m,
+    };
+  }
+  return {
+    abs2d: g('2d', 'abs_err'), abs3d: g('3d', 'abs_err'),
+    sign2d: g('2d', 'signed_err'), sign3d: g('3d', 'signed_err'),
+    rt2d: g('2d', 'rt'), rt3d: g('3d', 'rt'),
+    hit2d: hit('2d'), hit3d: hit('3d'),
+    byPos, nValid: valid.length,
+    timeout_n: trials.filter(t => t.timeout).length,
+    aoi2d: aoiMean(trials.filter(t => t.view === '2d'), ['sector', 'chart', 'resp', 'off']),
+    aoi3d: aoiMean(trials.filter(t => t.view === '3d'), ['sector', 'chart', 'resp', 'off']),
+  };
+}
+
+// =====================================================================
+// 可视化
+// =====================================================================
+const r0 = (v, d = 0) => (v == null ? '—' : v.toFixed(d));
+
+$('btn-viz').onclick = () => {
+  const s = getSession();
+  const f = s && s.results[EXP_FLANKER];
+  const p = s && s.results[EXP_PIE];
+  if (!f || !p) return toast('两个实验都完成后才能查看可视化');
+  showScreen('s-viz');
+  const body = $('vz-body');
+  body.innerHTML = '';
+
+  // ---------------- 实验一 ----------------
+  if (f) {
+    const st = flankerStats(f.trials);
+    const block = document.createElement('section');
+    block.className = 'block';
+    block.innerHTML = `
+      <h3>实验一 · Flanker 距离（2×2 被试内）</h3>
+      <p class="muted">提交：${f.submitted ? '✓ 已上传（' + (f.participants || 0) + ' 人）' : '✗ 未上传'} ｜ 追踪：${s.eyeMode === 'webgazer' ? '摄像头眼动' : '鼠标位置'}
+        ｜ 实际 gap：近 ${r0(st.gap_near, 1)} px / 远 ${r0(st.gap_far, 1)} px</p>
+      <div class="kv">
+        <span>总正确率 ${r0(st.acc_all, 1)}%</span>
+        <span>超时 ${st.timeout_n} 次</span>
+        <span>采样率 ${r0(st.gaze_hz, 1)} Hz</span>
+        <span>平均丢失 ${r0(st.gaze_lost, 1)} 帧/试次</span>
+      </div>
+      <h4>四条件平均反应时（仅正确试次，误差棒 = SE）</h4>
+      <div class="chart" id="vz-f-bar"></div>
+      <h4>一致性 × 距离 的交互</h4>
+      <div class="chart" id="vz-f-int"></div>
+      <h4>Flanker 效应（不一致 − 一致）</h4>
+      <div class="chart" id="vz-f-eff"></div>
+      ${st.aoi ? '<h4>AOI 平均停留时间</h4><div class="chart" id="vz-f-aoi"></div>' : '<p class="muted">本次没有有效注视采样，AOI 图略。</p>'}
+      <table class="tbl"><thead><tr><th>条件</th><th>n</th><th>RT (ms)</th><th>正确率</th></tr></thead><tbody>
+        <tr><td>近 · 一致</td><td>${st.cells.near_cong.n}</td><td>${r0(st.cells.near_cong.m, 0)}</td><td>${r0(st.accs.near_cong, 1)}%</td></tr>
+        <tr><td>近 · 不一致</td><td>${st.cells.near_incong.n}</td><td>${r0(st.cells.near_incong.m, 0)}</td><td>${r0(st.accs.near_incong, 1)}%</td></tr>
+        <tr><td>远 · 一致</td><td>${st.cells.far_cong.n}</td><td>${r0(st.cells.far_cong.m, 0)}</td><td>${r0(st.accs.far_cong, 1)}%</td></tr>
+        <tr><td>远 · 不一致</td><td>${st.cells.far_incong.n}</td><td>${r0(st.cells.far_incong.m, 0)}</td><td>${r0(st.accs.far_incong, 1)}%</td></tr>
+      </tbody></table>
+      <div class="note">${flankerConclusion(st)}</div>
+    `;
+    body.appendChild(block);
+
+    $('vz-f-bar').innerHTML = CHART.barChart({
+      items: [
+        { label: '近 · 一致', value: st.cells.near_cong.m || 0, sd: st.cells.near_cong.se || 0 },
+        { label: '近 · 不一致', value: st.cells.near_incong.m || 0, sd: st.cells.near_incong.se || 0 },
+        { label: '远 · 一致', value: st.cells.far_cong.m || 0, sd: st.cells.far_cong.se || 0 },
+        { label: '远 · 不一致', value: st.cells.far_incong.m || 0, sd: st.cells.far_incong.se || 0 },
+      ],
+      fmt: (v) => Math.round(v) + ' ms', height: 330,
+    });
+    $('vz-f-int').innerHTML = CHART.groupedBar({
+      groups: ['近（gap 2 px）', '远（gap 120 px）'],
+      series: [
+        { name: '一致', values: { '近（gap 2 px）': st.cells.near_cong.m || 0, '远（gap 120 px）': st.cells.far_cong.m || 0 }, color: CHART.GOLD },
+        { name: '不一致', values: { '近（gap 2 px）': st.cells.near_incong.m || 0, '远（gap 120 px）': st.cells.far_incong.m || 0 }, color: CHART.NAVY },
+      ],
+      fmt: (v) => Math.round(v) + ' ms', height: 320, yNote: '单位：ms',
+    });
+    $('vz-f-eff').innerHTML = CHART.barChart({
+      items: [
+        { label: '近距干扰效应', value: Math.max(0, st.eff_near || 0), color: CHART.RED },
+        { label: '远距干扰效应', value: Math.max(0, st.eff_far || 0), color: CHART.GOLD },
+      ],
+      fmt: (v) => (v >= 0 ? '+' : '') + Math.round(v) + ' ms', height: 250,
+      ref: 0, refLabel: '无效应',
+    });
+    if (st.aoi) {
+      $('vz-f-aoi').innerHTML = CHART.barChart({
+        items: [
+          { label: '目标字母区', value: Math.round(st.aoi.target), color: CHART.NAVY },
+          { label: '两侧干扰区', value: Math.round(st.aoi.flank), color: CHART.GOLD },
+          { label: '其他区域', value: Math.round(st.aoi.off), color: '#a9b4c6' },
+        ],
+        fmt: (v) => Math.round(v) + ' ms', height: 260,
+      });
+    }
+  }
+
+  // ---------------- 实验二 ----------------
+  if (p) {
+    const st = pieStats(p.trials);
+    const block = document.createElement('section');
+    block.className = 'block';
+    block.innerHTML = `
+      <h3>实验二 · 3D 透视饼图 vs 2D 平面饼图（Cleveland &amp; McGill, 1984）</h3>
+      <p class="muted">提交：${p.submitted ? '✓ 已上传（' + (p.participants || 0) + ' 人）' : '✗ 未上传'} ｜ 有效试次 ${st.nValid} ｜ 超时 ${st.timeout_n} 次</p>
+      <div class="kv">
+        <span>判断正确 = 与真实占比相差 ≤ ${P_TOL}%</span>
+        <span>2D 正确率 ${r0(st.hit2d, 1)}%</span>
+        <span>3D 正确率 ${r0(st.hit3d, 1)}%</span>
+      </div>
+      <h4>平均绝对误差（|选择 − 真实|）</h4>
+      <div class="chart" id="vz-p-abs"></div>
+      <h4>判断正确率</h4>
+      <div class="chart" id="vz-p-hit"></div>
+      <h4>有符号误差 × 扇区方位：正 = 高估，负 = 低估</h4>
+      <div class="chart" id="vz-p-sign"></div>
+      <h4>作答反应时</h4>
+      <div class="chart" id="vz-p-rt"></div>
+      ${st.aoi2d || st.aoi3d ? '<h4>AOI 平均停留时间</h4><div class="chart" id="vz-p-aoi"></div>' : ''}
+      <table class="tbl"><thead><tr><th>扇区方位</th><th>2D 有符号误差</th><th>3D 有符号误差</th></tr></thead><tbody>
+        ${P_POS.map(x => `<tr><td>${x.zh}</td><td>${r0(st.byPos[x.k].m2d, 1)}%</td><td>${r0(st.byPos[x.k].m3d, 1)}%</td></tr>`).join('')}
+      </tbody></table>
+      <div class="note">${pieConclusion(st)}</div>
+      <div class="note" style="border-left-color:var(--red)">
+        <b>理论依据</b>：透视错觉 —— 3D 图形的面积/体积估计违背基本几何规律。倾斜投影的椭圆在几何上仍是圆的仿射变换（面积比守恒），
+        所以任何系统性偏差都来自<b>深度线索</b>（厚度、前后遮挡、透视缩短）而非真实面积变化。<br>
+        <b>预测</b>：3D 误差率 &gt; 2D；3D 中<b>前景（近端）扇区被高估、后景（远端）扇区被低估</b>。
+      </div>
+    `;
+    body.appendChild(block);
+
+    $('vz-p-abs').innerHTML = CHART.barChart({
+      items: [
+        { label: '2D 平面饼图', value: st.abs2d.m || 0, sd: st.abs2d.se || 0, color: CHART.GOLD },
+        { label: '3D 透视饼图', value: st.abs3d.m || 0, sd: st.abs3d.se || 0, color: CHART.RED },
+      ],
+      fmt: (v) => v.toFixed(1) + '%', height: 280,
+    });
+    $('vz-p-hit').innerHTML = CHART.barChart({
+      items: [
+        { label: '2D 平面饼图', value: st.hit2d || 0, color: CHART.GOLD },
+        { label: '3D 透视饼图', value: st.hit3d || 0, color: CHART.RED },
+      ],
+      fmt: (v) => Math.round(v) + '%', height: 260,
+    });
+    $('vz-p-sign').innerHTML = CHART.diverging({
+      groups: P_POS.map(x => x.zh),
+      series: [
+        { name: '2D', values: Object.fromEntries(P_POS.map(x => [x.zh, st.byPos[x.k].m2d || 0])), color: CHART.GOLD },
+        { name: '3D', values: Object.fromEntries(P_POS.map(x => [x.zh, st.byPos[x.k].m3d || 0])), color: CHART.RED },
+      ],
+      fmt: (v) => (v > 0 ? '+' : '') + v.toFixed(1),
+      height: 340,
+    });
+    $('vz-p-rt').innerHTML = CHART.barChart({
+      items: [
+        { label: '2D 平面饼图', value: st.rt2d.m || 0, color: CHART.GOLD },
+        { label: '3D 透视饼图', value: st.rt3d.m || 0, color: CHART.RED },
+      ],
+      fmt: (v) => (v / 1000).toFixed(1) + ' s', height: 250,
+    });
+    if (st.aoi2d || st.aoi3d) {
+      const a2 = st.aoi2d, a3 = st.aoi3d;
+      $('vz-p-aoi').innerHTML = CHART.groupedBar({
+        groups: ['红色扇区', '饼图其余', '作答区', '其他'],
+        series: [
+          { name: '2D', values: {
+            '红色扇区': a2 ? Math.round(a2.sector) : 0, '饼图其余': a2 ? Math.round(a2.chart) : 0,
+            '作答区': a2 ? Math.round(a2.resp) : 0, '其他': a2 ? Math.round(a2.off) : 0 }, color: CHART.GOLD },
+          { name: '3D', values: {
+            '红色扇区': a3 ? Math.round(a3.sector) : 0, '饼图其余': a3 ? Math.round(a3.chart) : 0,
+            '作答区': a3 ? Math.round(a3.resp) : 0, '其他': a3 ? Math.round(a3.off) : 0 }, color: CHART.RED },
+        ],
+        fmt: (v) => Math.round(v) + ' ms', height: 320, yNote: '单位：ms（每试次平均）',
+      });
+    }
+  }
+};
+
+function flankerConclusion(st) {
+  const en = st.eff_near, ef = st.eff_far;
+  if (en == null || ef == null) return '数据不足，无法估计干扰效应。';
+  const base = `近距（gap≈${r0(st.gap_near, 0)} px）干扰效应 ${en > 0 ? '+' : ''}${Math.round(en)} ms，远距（gap≈${r0(st.gap_far, 0)} px）${ef > 0 ? '+' : ''}${Math.round(ef)} ms。`;
+  if (en > ef + 8) return base + '<br><b>结果方向符合“知觉负荷/空间分离”预期：干扰项离目标越近，注意难以把目标单独分离出来，冲突代价越大。</b>';
+  if (ef > en + 8) return base + '<br><b>本次结果与预期相反（远距效应更大）</b>，可结合试次数量、疲劳、外周拥挤（crowding）或鼠标/眼动噪声来解释。';
+  return base + '<br>两种距离下的干扰效应差别不大，可能被试数量或试次不足，也可能被试采用了较强的空间选择性注意策略。';
+}
+
+function pieConclusion(st) {
+  const d2 = st.abs2d.m, d3 = st.abs3d.m;
+  if (d2 == null || d3 == null) return '数据不足，无法比较两种呈现方式。';
+  const diff = d3 - d2;
+  const front = st.byPos.front, back = st.byPos.back;
+  let txt = `平均绝对误差：2D ${d2.toFixed(1)}% vs 3D ${d3.toFixed(1)}%（差 ${diff > 0 ? '+' : ''}${diff.toFixed(1)} 个百分点）；`
+    + `正确率 2D ${r0(st.hit2d, 1)}% vs 3D ${r0(st.hit3d, 1)}%。<br>`;
+  txt += diff > 1
+    ? '<b>支持预测：3D 透视饼图的判断误差更大。</b>倾斜与厚度等深度线索让扇形“看起来”与实际角度不符。'
+    : (diff < -1
+      ? '<b>与预测相反：本次 3D 的误差反而更小。</b>可能原因：立体图形更醒目、被试用了更多时间、或试次太少。'
+      : '<b>两者差别很小</b>，可能被试数量 / 试次不足，也可能被试对饼图比例已相当熟练。');
+  const f3 = front.m3d, b3 = back.m3d;
+  if (f3 != null && b3 != null) {
+    txt += `<br>3D 中的前景偏差 ${f3 > 0 ? '+' : ''}${f3.toFixed(1)}%、后景偏差 ${b3 > 0 ? '+' : ''}${b3.toFixed(1)}%：`
+      + (f3 > b3 + 1
+        ? '<b>呈现典型的前景高估 / 后景低估模式。</b>'
+        : '本次未出现明显的前后不对称，可能被扇区颜色、注视位置或试次数量掩盖。');
+  }
+  return txt;
+}
+
+$('vz-back').onclick = () => gotoMenu();
+
+$('vz-export').onclick = () => {
+  const s = getSession();
+  if (!s) return;
+  const blob = new Blob([JSON.stringify(s, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `attn_${s.participant}_${Date.now()}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  toast('已导出本机数据 JSON');
+};
+
+// =====================================================================
+// 启动
+// =====================================================================
+(function boot() {
+  GAZE.setStage($('s-stage'));
+  const s = getSession();
+  if (s) {
+    if (s.eyeMode === 'mouse') { GAZE.startMouse(); gotoMenu(); }
+    else { showScreen('s-consent'); $('in-pid').value = s.participant; $('cam-status').textContent = '上次使用摄像头模式，请重新授权或改用鼠标模式'; }
+  } else {
+    showScreen('s-consent');
+  }
+  // 防止方向键滚动页面
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key) && $('s-stage').classList.contains('show')) e.preventDefault();
+  }, { passive: false });
+})();
+</script>
+</body>
+</html>

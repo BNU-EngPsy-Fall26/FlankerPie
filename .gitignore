@@ -1,0 +1,23 @@
+# 分析输出（由 analysis.py 生成）
+results/*
+!results/.gitkeep
+
+# 原始数据导出（含被试数据，不上传仓库）
+data/*.json
+data/*.csv
+data/*.tsv
+
+# 保密信息：课程项目下载密钥绝不入库
+key*.txt
+*.key
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
